@@ -43,7 +43,7 @@ File currentFile;
 // Режимы и навигация
 byte currentMode = MODE_MENU;
 byte menuItem = 0;
-const char* menuItems[] = {"SD Reader", "Calculator"};
+const char* menuItems[] = {"SD читaлкa", "Kaлькyлятop"};
 const byte menuItemsCount = 2;
 
 // Для файлового менеджера
@@ -52,6 +52,7 @@ String selectedFileName = "";   // имя выбранного файла
 int8_t filesAmount = 0;
 int8_t selectedFileIndex = 0;
 uint32_t btnTimer;
+bool lypaFlag = false;
 
 struct Calculator {
   enum State { INPUT_FIRST, INPUT_SECOND, RESULT };
@@ -319,7 +320,7 @@ void drawMainMenu() {
   oled.home();
 
   oled.scale2X();
-  oled.println(" Shlepok");
+  oled.println(" Шлeпoк");
   oled.scale1X();
   oled.println("==========");
   oled.println();
@@ -337,7 +338,7 @@ void drawMainMenu() {
   oled.inverse(false);
   
   oled.setCursor(0, 7);
-  oled.print("RAM: ");
+  oled.print("O3У: ");
   oled.print(freeRam());
   oled.print(" B");
   
@@ -351,18 +352,16 @@ void showSDInfo() {
   oled.scale1X();
 
   if (filesAmount > 0) {
-    oled.print("SD Card info:");
-    oled.setCursor(0, 2);
-    oled.print("Type: ");
+    oled.println("Tип SD Kapты:");
     switch (card.type()) {
-      case SD_CARD_TYPE_SD1: oled.print("SD1"); break;
-      case SD_CARD_TYPE_SD2: oled.print("SD2"); break;
-      case SD_CARD_TYPE_SDHC: oled.print("SDHC"); break;
-      default: oled.print("Unknown");
+      case SD_CARD_TYPE_SD1: oled.println("SD1"); break;
+      case SD_CARD_TYPE_SD2: oled.println("SD2"); break;
+      case SD_CARD_TYPE_SDHC: oled.println("SDHC"); break;
+      default: oled.println("Xepня");
     }
 
     oled.setCursor(0, 4);
-    oled.print("Size: ");
+    oled.print("Paзмep: ");
     uint32_t size = card.cardSize();
     size *= 512;
     size /= 1048576;
@@ -370,12 +369,10 @@ void showSDInfo() {
     oled.println(" MB");
 
     oled.setCursor(0, 6);
-    oled.print("Files: ");
+    oled.print("Фaйлoв: ");
     oled.print(filesAmount);
   } else {
-    oled.print("No SD card");
-    oled.setCursor(0, 3);
-    oled.print("or no files");
+    oled.print("Heт SD/фaйлoв");
   }
 
   oled.update();
@@ -442,6 +439,8 @@ void readFilePage() {
 
   oled.clear();
   oled.home();
+  if(lypaFlag) {oled.scale1X();}
+  else {oled.scale2X();}
 
   // Читаем и выводим пока не заполнится экран или не конец файла
   while (!oled.isEnd()) {
@@ -596,7 +595,7 @@ void initSD() {
 // ================ ВОЗВРАТ В ФАЙЛОВЫЙ МЕНЕДЖЕР ================
 void returnToFileManager() {
   sdStart();
-  
+  oled.scale1X();
   if (currentFile) {
     currentFile.close();
     currentFile = File();
@@ -638,11 +637,10 @@ void fileManagerLoop() {
       checkActivity();
     }
 
-    // Удержание SET - выход в файловый менеджер
+    // Нажатие SET - лупа
     if (buttSET.clicked()) {
-      sdStart();
-      homePage();
-      sdEnd();
+      lypaFlag = lypaFlag ? false : true;
+      prevPage(100);
       checkActivity();
     }
 
@@ -732,10 +730,16 @@ void prevPage() {
   readFilePage();
 }
 
-void homePage(){
+void prevPage(uint16_t bytes) {
   if (!currentFile) return;
   
-  currentFile.seek(0);
+  // Отматываем назад на 500 байт (примерно страница)
+  uint32_t pos = currentFile.position();
+  if (pos > bytes) {
+    currentFile.seek(pos - bytes);
+  } else {
+    currentFile.seek(0);
+  }
   readFilePage();
 }
 
@@ -748,28 +752,13 @@ void openFile() {
 
   currentFile = SD.open(selectedFileName.c_str(), FILE_READ);
 
-  if (!currentFile) {
+  if (!currentFile || currentFile.isDirectory()) {
+    if(currentFile.isDirectory()) currentFile.close();
     oled.clear();
     oled.home();
-    oled.print("Can't open");
+    oled.print("Oшибka");
     oled.setCursor(0, 2);
     oled.print(selectedFileName);
-    oled.update();
-    delay(1000);
-    selectedFileName = "";
-    sdEnd();
-    sdStart();
-    initSD();
-    listFiles();
-    sdEnd();
-    return;
-  }
-
-  if (currentFile.isDirectory()) {
-    currentFile.close();
-    oled.clear();
-    oled.home();
-    oled.print("Can't open dir");
     oled.update();
     delay(1000);
     selectedFileName = "";
@@ -842,7 +831,7 @@ void calculatorLoop() {
     oled.home();
 
     oled.scale1X();
-    oled.print(" CALC");
+    oled.print(" Kaлbkyлятop");
     oled.setCursor(0, 1);
     oled.println("==============");
 
@@ -851,9 +840,9 @@ void calculatorLoop() {
       oled.print("Select op:");
     } else {
       switch (calc.state) {
-        case Calculator::INPUT_FIRST: oled.print("Enter A:"); break;
-        case Calculator::INPUT_SECOND: oled.print("Enter B:"); break;
-        case Calculator::RESULT: oled.print("Result:"); break;
+        case Calculator::INPUT_FIRST: oled.print("A:"); break;
+        case Calculator::INPUT_SECOND: oled.print("B:"); break;
+        case Calculator::RESULT: oled.print("OTBET:"); break;
       }
     }
 
